@@ -1,0 +1,27 @@
+CompileFlags:
+  Add:
+    - -x
+    - c
+    - -std=gnu89
+    - -Wall
+    - -Wextra
+    - -Wno-gnu-empty-struct
+    - -Wswitch-enum
+    - -I.
+    - -I..
+    - -Isrc
+
+  Remove:
+    - -fPIC
+    - -pipe
+
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Loose
+
+InlayHints:
+  Enabled: true
+  ParameterNames: true
+
+Hover:
+  ShowAKA: true
