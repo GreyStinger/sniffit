@@ -6,25 +6,7 @@
 
 #include <config.h>
 
-#define INCLUDE_INTERFACE            /* By default */
-
-#ifndef HAVE_SHMGET                                 /* No Shared memory  */
-#undef INCLUDE_INTERFACE
-#endif
-#ifndef HAVE_LIBNCURSES                             /* ncurses not found */
-#undef INCLUDE_INTERFACE
-#endif
-#ifndef HAVE_NCURSES_H                              /* ncurses not found */
-#undef INCLUDE_INTERFACE
-#endif
-#ifdef IRIX                                      /* No interface on IRIX */
-#undef INCLUDE_INTERFACE
-#endif
-
-/* Not supported yet */
-#ifdef BSDI
-#undef INCLUDE_INTERFACE
-#endif
+/* Definition of INCLUDE_INTERFACE is now handled in config.h by Autoconf  */
 
 #ifdef HAVE_ATEXIT
 #define exit_func(x)    atexit(x)

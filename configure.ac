@@ -12,20 +12,9 @@ AC_CONFIG_HEADERS([config.h])
 # Checks for programs.
 AC_PROG_CC
 
-# Checks for libraries.
-# FIXME: sniffit links with libncurses when it is available, even if it does
-# not use it because src/sn_config.h does not define INCLUDE_INTERFACE because
-# other conditions are not met.  It would be better to move that logic entirely
-# to Autoconf and to define (or not) INCLUDE_INTERFACE only here.
-AC_CHECK_LIB(ncurses, initscr)
-AC_CHECK_LIB(pcap, pcap_open_live, , [AC_MSG_ERROR([Couldn't find libpcap])])
-
-# Checks for header files.
-AC_CHECK_HEADERS([ncurses.h])
+# Checks for pcap.
+AC_CHECK_LIB([pcap], [pcap_open_live], [], [AC_MSG_ERROR([Couldn't find libpcap])])
 AC_CHECK_HEADERS([pcap.h], , AC_MSG_ERROR([pcap.h not found]))
-
-dnl Check Shared Memory support
-AC_CHECK_FUNCS(shmget)
 
 dnl exit function check
 AC_CHECK_FUNCS(atexit)
@@ -59,6 +48,66 @@ else
     else
         AC_DEFINE(USE_32_INT, 1, [none])
     fi
+fi
+
+AC_MSG_CHECKING([is IRIX platform])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    #ifdef __sgi
+    /* IRIX Macro from github:cpredef/predef/OperatingSystems.md#L314 */
+    #else
+    #error Not IRIX Platform
+    #endif
+]])], [
+    enable_interface=no
+    AC_MSG_RESULT([yes])
+    AC_MSG_NOTICE([Interactive interface is not supported on IRIX])
+], [
+    enable_interface=yes
+    AC_MSG_RESULT([no])
+])
+AC_MSG_CHECKING([is BSDI platform])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    #ifdef __bsdi__
+    /* BSDI Macro from github:cpredef/predef/OperatingSystems.md#L103 */
+    #else
+    #error Not BSDI Platform
+    #endif
+]])], [
+    enable_interface=no
+    AC_MSG_RESULT([yes])
+    AC_MSG_NOTICE([Interactive interface is not supported on BSDI])
+], [
+    AC_MSG_RESULT([no])
+])
+
+dnl Check Shared Memory support
+AC_CHECK_FUNCS(shmget)
+if test "$ac_cv_func_shmget" != yes; then
+    enable_interface=no
+    AC_MSG_NOTICE([The interactive interface requires shared memory functionality])
+fi
+
+dnl Find ncurses.h and link ncurses only if all other checks pass
+if test "$enable_interface" = yes; then
+    # Checks for ncurses
+    AC_CHECK_HEADERS([ncurses.h], [
+        dnl Have header so we can now check for ncurses library
+        AC_CHECK_LIB([ncurses], [initscr], [], [
+            enable_interface=no
+            AC_MSG_NOTICE([The interactive interface requires ncurses library])
+        ])
+    ], [
+        enable_interface=no
+        AC_MSG_NOTICE([The interactive interface requires ncurses.h header])
+    ])
+fi
+
+dnl Define INCLUDE_INTERFACE or not
+if test "$enable_interface" = yes; then
+    AC_DEFINE(INCLUDE_INTERFACE, 1, [Define to 1 to enable interactive interface])
+    AC_MSG_NOTICE([Interactive interface: Enabled])
+else
+    AC_MSG_NOTICE([Interactive interface: Disabled])
 fi
 
 AC_CONFIG_FILES([Makefile src/Makefile])
