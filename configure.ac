@@ -50,35 +50,8 @@ else
     fi
 fi
 
-AC_MSG_CHECKING([is IRIX platform])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-    #ifdef __sgi
-    /* IRIX Macro from github:cpredef/predef/OperatingSystems.md#L314 */
-    #else
-    #error Not IRIX Platform
-    #endif
-]])], [
-    enable_interface=no
-    AC_MSG_RESULT([yes])
-    AC_MSG_NOTICE([Interactive interface is not supported on IRIX])
-], [
-    enable_interface=yes
-    AC_MSG_RESULT([no])
-])
-AC_MSG_CHECKING([is BSDI platform])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-    #ifdef __bsdi__
-    /* BSDI Macro from github:cpredef/predef/OperatingSystems.md#L103 */
-    #else
-    #error Not BSDI Platform
-    #endif
-]])], [
-    enable_interface=no
-    AC_MSG_RESULT([yes])
-    AC_MSG_NOTICE([Interactive interface is not supported on BSDI])
-], [
-    AC_MSG_RESULT([no])
-])
+# Interface support checking
+enable_interface=yes
 
 dnl Check Shared Memory support
 AC_CHECK_FUNCS(shmget)
