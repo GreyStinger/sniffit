@@ -59,7 +59,7 @@ int unwrap_packet (unsigned char *sp, struct unwrap *unwrapped)
 		{
 		sp[PROTO_HEAD+10]=0;       /* reset checksum to zero, Q&D way*/
 		sp[PROTO_HEAD+11]=0;
-		if(in_cksum((sp+PROTO_HEAD),unwrapped->IP_len) != IPhead.checksum)
+		if(in_cksum((sp+PROTO_HEAD),unwrapped->IP_len) != ntohs(IPhead.checksum))
 			{
 #ifdef DEBUG_ONSCREEN
 			printf("Packet dropped... (invalid IP chksum)\n");

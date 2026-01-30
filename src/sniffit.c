@@ -1860,7 +1860,7 @@ if (Plugin_Active[9] == 1)
         sizeof (int) +
         sizeof (unsigned long) + sizeof (int) + sizeof (int) + sizeof (unsigned long) +
         sizeof (int) + sizeof (int);
-      memory_id = shmget (0, memsize, 0700);
+      memory_id = shmget(IPC_PRIVATE, memsize, IPC_CREAT | 0600);
       if (memory_id < 0)
 	{
 	  perror ("Interactive Sniffer Heartattack (No Shared mem avail!)");
