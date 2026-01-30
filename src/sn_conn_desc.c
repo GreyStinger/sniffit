@@ -4,12 +4,14 @@
 
 /* Simple PORT BASED detection */
 
+unsigned short src_port_h = ntohs(tcphead.source);
+unsigned short dst_port_h = ntohs(tcphead.destination);
+
 /*** FTP sessions ********************************************************/
-if(
-(ntohs(tcphead.source)==FTP_DATA_1)||(ntohs(tcphead.destination)==FTP_DATA_1) )
+if( (src_port_h==FTP_DATA_1)||(dst_port_h==FTP_DATA_1) )
   {strcpy(desc_string, "FTP DATA");}
 
-if( (ntohs(tcphead.source)==FTP_1)||(ntohs(tcphead.destination)==FTP_1) )
+if( (src_port_h==FTP_1)||(dst_port_h==FTP_1) )
   {
   if(info->DATA_len==0)
     strcpy(desc_string, "FTP");
@@ -32,39 +34,39 @@ if( (ntohs(tcphead.source)==FTP_1)||(ntohs(tcphead.destination)==FTP_1) )
   }
 
 /*** TELNET sessions *****************************************************/
-if( (ntohs(tcphead.source)==TELNET_1)||(ntohs(tcphead.destination)==TELNET_1) )
+if( (src_port_h==TELNET_1)||(dst_port_h==TELNET_1) )
   {strcpy(desc_string, "TELNET");}
 
 /*** SSH sessions ********************************************************/
-if( (ntohs(tcphead.source)==SSH_1)||(ntohs(tcphead.destination)==SSH_1) )
+if( (src_port_h==SSH_1)||(dst_port_h==SSH_1) )
   {strcpy(desc_string, "Secure Shell");}
 
 /*** MAIL sessions *****************************************************/
-if( (ntohs(tcphead.source)==MAIL_1)||(ntohs(tcphead.destination)==MAIL_1) )
+if( (src_port_h==MAIL_1)||(dst_port_h==MAIL_1) )
   {strcpy(desc_string, "MAIL");}
 
 /*** IDENT **************************************************************/
-if( (ntohs(tcphead.source)==IDENT_1)||(ntohs(tcphead.destination)==IDENT_1) )
+if( (src_port_h==IDENT_1)||(dst_port_h==IDENT_1) )
   {strcpy(desc_string, "IDENT");}
 
 /*** IRC ***************************************************************/
-if( (ntohs(tcphead.source)==IRC_1)||(ntohs(tcphead.destination)==IRC_1) )
+if( (src_port_h==IRC_1)||(dst_port_h==IRC_1) )
   {strcpy(desc_string, "IRC");}
 
 /*** X11 sessions *******************************************************/
-if( (ntohs(tcphead.source)==X11_1)||(ntohs(tcphead.destination)==X11_1) )
+if( (src_port_h==X11_1)||(dst_port_h==X11_1) )
   {strcpy(desc_string, "X-Windows");}
 
 /*** HTTP ***************************************************************/
-if( (ntohs(tcphead.source)==HTTP_1)||(ntohs(tcphead.source)==HTTP_2)||
-    (ntohs(tcphead.source)==HTTP_3)||(ntohs(tcphead.source)==HTTP_4)
+if( (src_port_h==HTTP_1)||(src_port_h==HTTP_2)||
+    (src_port_h==HTTP_3)||(src_port_h==HTTP_4)
   )
   {
   strcpy(desc_string, "HTTP");
   }
 
-if( (ntohs(tcphead.destination)==HTTP_1)||(ntohs(tcphead.destination)==HTTP_2) ||
-    (ntohs(tcphead.destination)==HTTP_3)||(ntohs(tcphead.destination)==HTTP_4)
+if( (dst_port_h==HTTP_1)||(dst_port_h==HTTP_2) ||
+    (dst_port_h==HTTP_3)||(dst_port_h==HTTP_4)
   )
   {
   if(info->DATA_len==0)
@@ -85,4 +87,34 @@ if( (ntohs(tcphead.destination)==HTTP_1)||(ntohs(tcphead.destination)==HTTP_2) |
     }
   }
 
+/*** DYNAMIC SERVICE DETECTION ******************************************/
+if(strcmp(desc_string, "Unknown") == 0) {
+    struct servent *service;
+    unsigned short dst_port = tcphead.destination;
+    unsigned short src_port = tcphead.source;
+
+    service = getservbyport((int)dst_port, "tcp");
+    if(service != NULL && service->s_name != NULL) {
+        strncpy(desc_string, service->s_name, (*DESC_LEN) - 1);
+        desc_string[(*DESC_LEN) - 1] = '\0';
+        for(i = 0; desc_string[i] != '\0'; i++) {
+            if(desc_string[i] >= 'a' && desc_string[i] <= 'z')
+                desc_string[i] = desc_string[i] - 32;
+        }
+    }
+    else {
+        service = getservbyport((int)src_port, "tcp");
+        if(service != NULL && service->s_name != NULL) {
+            strncpy(desc_string, service->s_name, (*DESC_LEN) - 1);
+            desc_string[(*DESC_LEN) - 1] = '\0';
+            for(i = 0; desc_string[i] != '\0'; i++) {
+                if(desc_string[i] >= 'a' && desc_string[i] <= 'z')
+                    desc_string[i] = desc_string[i] - 32;
+            }
+        }
+        else {
+            strcpy(desc_string, "Unknown");
+        }
+    }
+}
 

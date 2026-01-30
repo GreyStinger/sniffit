@@ -339,6 +339,22 @@ ENTER     : a window will pop up and log the connection, or the connection
             Packets contain the line: "This Packet was fired with Sniffit!"
 'r'       : Reset.. clears all current connections from memory and restarts.
 
+Note on Extended Interactive Mode (-I) Performance:
+  Extended interactive mode now resolves port numbers to service names for
+  better readability. If you notice performance issues with many connections,
+  you could maybe enable service name caching using nscd.
+
+  I think that by default on most distributions, nscd does NOT cache services
+  and this includes gethost.
+
+  At the time of writing this what worked for me in my ncsd.conf is:
+     enable-cache            services        yes
+     positive-time-to-live   services        3600
+     negative-time-to-live   services        20
+
+  This will cache getservbyport() lookups and significantly improve
+  performance when monitoring many connections simultaneously.
+
 
 3.2 Forcing network devices   (*READ*)
 --------------------------------------

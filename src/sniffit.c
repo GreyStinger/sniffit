@@ -50,6 +50,7 @@ static void delete_dynam (char *, char, char);
 static char Copyright[] =
 "Sniffit - Brecht Claerhout - Copyright 1996-98";
 
+
 static void quit (char *prog_name)		/* Learn to use the program */
 {
   printf (

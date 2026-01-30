@@ -624,7 +624,7 @@ alarm(INFO_TIMER);
 
 void child_exit (void)
 {
-kill(Pid,SIGKILL);
+  kill(Pid, SIGTERM);
 };
 
 static void screen_exit (void)
@@ -920,8 +920,10 @@ while(1)
     		case KEY_F(10):
        			 if(LOGGING==1)
           			{stop_logging();}
-       			 else
-				{kill(Pid,SIGKILL);exit(0);}
+        else {
+          kill(Pid, SIGTERM);
+          exit(0);
+        }
 			break;
 		case '1':
 		case KEY_F(1):
