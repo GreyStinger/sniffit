@@ -53,6 +53,97 @@ extern int INFO_WINDOW_X, INFO_WINDOW_Y, MASK_WINDOW_X, MASK_WINDOW_Y;
 extern int DATA_WINDOW_X, DATA_WINDOW_Y;
 
 
+/*** Color capability detection and RGB mapping ***/
+
+struct rgb_color {
+    unsigned char r, g, b;
+};
+
+static short rgb_to_256_color(struct rgb_color *rgb)
+{
+    unsigned char r, g, b;
+    unsigned char r_idx, g_idx, b_idx;
+
+    r = rgb->r;
+    g = rgb->g;
+    b = rgb->b;
+
+    if (r == g && g == b) {
+        if (r < 8)
+            return 16;
+        if (r > 247)
+            return 231;
+        return (short)(232 + ((r - 8) / 10));
+    }
+
+    r_idx = (r < 48) ? 0 : (r < 115) ? 1 : (unsigned char)((r - 55) / 40);
+    g_idx = (g < 48) ? 0 : (g < 115) ? 1 : (unsigned char)((g - 55) / 40);
+    b_idx = (b < 48) ? 0 : (b < 115) ? 1 : (unsigned char)((b - 55) / 40);
+
+    return (short)(16 + (36 * r_idx) + (6 * g_idx) + b_idx);
+}
+
+static short rgb_to_16_color(struct rgb_color *rgb)
+{
+    unsigned char r, g, b;
+    unsigned char color;
+    unsigned char max;
+
+    r = rgb->r;
+    g = rgb->g;
+    b = rgb->b;
+
+    color = 0;
+    if (r > 127)
+        color |= 1;
+    if (g > 127)
+        color |= 2;
+    if (b > 127)
+        color |= 4;
+
+    max = r;
+    if (g > max)
+        max = g;
+    if (b > max)
+        max = b;
+
+    if (color > 0 && max > 192) {
+        color += 8;
+    }
+
+    return (short)color;
+}
+
+static short rgb_to_8_color(struct rgb_color *rgb)
+{
+    unsigned char r, g, b;
+    unsigned char color;
+
+    r = rgb->r;
+    g = rgb->g;
+    b = rgb->b;
+
+    color = 0;
+    if (r > 127)
+        color |= 1;
+    if (g > 127)
+        color |= 2;
+    if (b > 127)
+        color |= 4;
+
+    return (short)color;
+}
+
+static short map_rgb_to_ncurses(struct rgb_color *rgb)
+{
+    if (COLORS >= 256)
+        return rgb_to_256_color(rgb);
+    else if (COLORS >= 16)
+        return rgb_to_16_color(rgb);
+    else
+        return rgb_to_8_color(rgb);
+}
+
 /*** forward declarations ***/
 static void stop_logging (void);
 static void screen_exit (void);
@@ -66,17 +157,30 @@ cbreak();
 noecho();
 nonl();
 clear();
-if(has_colors()==TRUE)
-	{
-  	COLOR_AVAIL=1;
- 	start_color();
- 	init_pair(WIN_COLOR_NORMAL,COLOR_WHITE,COLOR_BLUE);
-  	init_pair(WIN_COLOR_POINT,COLOR_BLUE,COLOR_CYAN);
-  	init_pair(WIN_COLOR_DATA,COLOR_BLUE,COLOR_CYAN);
- 	init_pair(WIN_COLOR_INPUT,COLOR_BLUE,COLOR_CYAN);
-  	init_pair(WIN_COLOR_MENU,COLOR_BLUE,COLOR_CYAN);
-  	init_pair(WIN_COLOR_PACKET_INFO,COLOR_BLUE,COLOR_CYAN);
-  	}
+if(has_colors() == TRUE)
+  { /* Maybe will make it easier to compile with a diff to change the colors */
+    struct rgb_color fg, bg;
+    short fg_nc, bg_nc;
+
+    start_color();
+    COLOR_AVAIL=1;
+
+    fg.r = 0xFF; fg.g = 0xFF; fg.b = 0xFF;
+    bg.r = 0x00; bg.g = 0x00; bg.b = 0xFF;
+    fg_nc = map_rgb_to_ncurses(&fg);
+    bg_nc = map_rgb_to_ncurses(&bg);
+    init_pair(WIN_COLOR_NORMAL, fg_nc, bg_nc);
+
+    fg.r = 0x00; fg.g = 0x00; fg.b = 0xFF;
+    bg.r = 0x00; bg.g = 0xFF; bg.b = 0xFF;
+    fg_nc = map_rgb_to_ncurses(&fg);
+    bg_nc = map_rgb_to_ncurses(&bg);
+    init_pair(WIN_COLOR_POINT, fg_nc, bg_nc);
+    init_pair(WIN_COLOR_DATA, fg_nc, bg_nc);
+    init_pair(WIN_COLOR_INPUT, fg_nc, bg_nc);
+    init_pair(WIN_COLOR_MENU, fg_nc, bg_nc);
+    init_pair(WIN_COLOR_PACKET_INFO, fg_nc, bg_nc);
+  }
 else
 	{
 	COLOR_AVAIL=0;
