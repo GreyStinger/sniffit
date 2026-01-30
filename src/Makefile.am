@@ -3,4 +3,5 @@
 # Under BSD-3-CLause license.
 
 sbin_PROGRAMS = sniffit
+AM_CFLAGS = -std=gnu89
 sniffit_SOURCES = sn_packets.c sn_generation.c sn_interface.c sn_cfgfile.c sn_logfile.c sn_resolv.c sniffit.c
