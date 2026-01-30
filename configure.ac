@@ -37,16 +37,16 @@ if test $ac_cv_sizeof_unsigned_short_int -ne 2; then
     AC_MSG_ERROR([unsigned short is NOT 2 bytes... quiting])
 fi
 
-AC_CHECK_SIZEOF(unsigned long int)
-if test $ac_cv_sizeof_unsigned_long_int -eq 4; then
-AC_DEFINE(USE_32_LONG_INT, 1, [none])
+AC_CHECK_SIZEOF(unsigned int)
+if test $ac_cv_sizeof_unsigned_int -eq 4; then
+    AC_DEFINE(USE_32_INT, 1, [Use unsigned int for 32-bit type])
 else
-    echo "unsigned long is NOT 4 bytes... hmmm..."
-    AC_CHECK_SIZEOF(unsigned int)
-    if test $ac_cv_sizeof_unsigned_int -ne 4; then
-        AC_MSG_ERROR([unsigned int is NOT 4 bytes either... quiting])
+    echo "Unsigned int is NOT 4 bytes... checking unsigned long?..."
+    AC_CHECK_SIZEOF(unsigned long int)
+    if test $ac_cv_sizeof_unsigned_long_int -ne 4; then
+        AC_MSG_ERROR([Unsigned long is not 4 bytes either... quitting])
     else
-        AC_DEFINE(USE_32_INT, 1, [none])
+        AC_DEFINE(USE_32_LONG_INT, 1, [Use unsigned long int for 32-bit type])
     fi
 fi
 
