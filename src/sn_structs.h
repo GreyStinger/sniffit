@@ -4,6 +4,7 @@
 #define _SN_STRUCTS_H_
 
 #include <stdio.h>
+#include <config.h>
 #include "sn_packetstructs.h"
 
 /**** Global data **********************************************************/
@@ -47,6 +48,9 @@ struct Plugin_data {
 /**** Global data (interactive) *********************************************/
 #ifdef INCLUDE_INTERFACE
 #include "sn_curses.h"
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 struct box_window
 {
@@ -90,6 +94,20 @@ struct sp_data_exchange {
         int IP_optlen;             /* IP options length in bytes  */
         int TCP_optlen;            /* TCP options length in bytes */
         };
+
+/* Semaphore indices in the set */
+#define SEM_STARTUP_BARRIER   0
+#define SEM_SCREEN_MUTEX      1
+#define SEM_CONN_LIST         2     /* for running_connections array */
+#define SEM_DATA_BUFFER       3     /* for connection_data buffer */
+#define SEM_COUNT             4
+
+/* stolen from semctl(2) */
+union semun {
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+};
 #endif
 
 #endif

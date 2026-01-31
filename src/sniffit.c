@@ -10,14 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
-/* #include <netdb.h> */
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
-/* #include <arpa/inet.h> */		/*  for inet_addr() */
 #ifdef INCLUDE_INTERFACE
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -46,6 +44,83 @@
 
 /*** forward declarations ***/
 static void delete_dynam (char *, char, char);
+
+#ifdef INCLUDE_INTERFACE
+int sysv_sem_wait(int semid, int sem_num)
+{
+    struct sembuf op;
+    op.sem_num = sem_num;
+    op.sem_op  = -1;
+    op.sem_flg = 0;
+    return semop(semid, &op, 1);
+}
+
+int sysv_sem_post(int semid, int sem_num)
+{
+    struct sembuf op;
+    op.sem_num = sem_num;
+    op.sem_op  = 1;
+    op.sem_flg = 0;
+    return semop(semid, &op, 1);
+}
+
+int sysv_sem_timedwait(int semid, int sem_num, int timeout_sec)
+{
+#ifdef HAVE_SEMTIMEDOP
+    struct sembuf op;
+    struct timespec ts;
+
+    op.sem_num = sem_num;
+    op.sem_op  = -1;
+    op.sem_flg = 0;
+
+    ts.tv_sec  = timeout_sec;
+    ts.tv_nsec = 0;
+
+    return semtimedop(semid, &op, 1, &ts);
+#else
+    /* fallback without semtimedop */
+    struct sembuf op;
+    time_t start_time, current_time;
+    int result;
+
+    op.sem_num = sem_num;
+    op.sem_op  = -1;
+    op.sem_flg = IPC_NOWAIT;
+
+    start_time = time(NULL);
+
+    while (1)
+    {
+        result = semop(semid, &op, 1);
+        if (result == 0)
+            return 0;
+
+        if (errno != EAGAIN)
+            return -1;
+
+        current_time = time(NULL);
+        if (current_time - start_time >= timeout_sec)
+        {
+            errno = ETIMEDOUT;
+            return -1;
+        }
+
+        usleep(100000);  /* 100ms */
+    }
+#endif
+}
+
+int sysv_mutex_lock(int semid, int sem_num)
+{
+    return sysv_sem_wait(semid, sem_num);
+}
+
+int sysv_mutex_unlock(int semid, int sem_num)
+{
+    return sysv_sem_post(semid, sem_num);
+}
+#endif
 
 static char Copyright[] =
 "Sniffit - Brecht Claerhout - Copyright 1996-98";
@@ -1492,20 +1567,28 @@ interactive_packethandler (unsigned char *dummy,
     return;			/* Packet is not for us */
 
   if (finish != TCP_FINISH)	/* finish: already logged, or to short to add */
+    {
+    sysv_sem_wait(*semid, SEM_CONN_LIST);
     add_itemlist (running_connections, conn_name, desc_string);
+    sysv_sem_post(*semid, SEM_CONN_LIST);
+    }
   if (strcmp (log_conn->log_enter, conn_name) == 0)
     {
       const unsigned char *data = sp + PROTO_HEAD + info.IP_len + info.TCP_len;
+      sysv_sem_wait(*semid, SEM_DATA_BUFFER);
       if (*DATAlength + info.DATA_len < LENGTH_OF_INTERPROC_DATA)
 	{
 	  memcpy ((connection_data + *DATAlength), data, info.DATA_len);
 	  *DATAlength += info.DATA_len;
 	}
+      sysv_sem_post(*semid, SEM_DATA_BUFFER);
     }
   if (finish == TCP_FINISH)
     {
+      sysv_sem_wait(*semid, SEM_CONN_LIST);
       del_itemlist (running_connections, conn_name);
       del_itemlist (running_connections, conn_name2);
+      sysv_sem_post(*semid, SEM_CONN_LIST);
     }
   kill (getppid (), SIGUSR1);
 }
@@ -1854,7 +1937,8 @@ if (Plugin_Active[9] == 1)
 #ifdef INCLUDE_INTERFACE
   if (SNIFMODE == INTERACTIVE)
     {
-      memsize = sizeof (int) + LENGTH_OF_INTERPROC_DATA +
+      memsize = sizeof (int) +
+        sizeof (int) + LENGTH_OF_INTERPROC_DATA +
         sizeof (int) + sizeof (struct snif_mask) +
         sizeof (struct shared_logged_conn) +
         (CONNECTION_CAPACITY * sizeof (struct shared_conn_data)) +
@@ -1876,8 +1960,9 @@ if (Plugin_Active[9] == 1)
       printf ("Entering Shared memory at %p\n", SHARED);
       printf ("Shared %zu\n", memsize);
 
-      /* set all pointers */
-      DATAlength = (int *) SHARED;
+      /* set all pointers with semid first for alignment */
+      semid = (int *) SHARED;
+      DATAlength = (int *) (semid + 1);
       connection_data = (char *) (DATAlength + 1);
       LISTlength = (int *) (connection_data + LENGTH_OF_INTERPROC_DATA);
       mask = (struct snif_mask *)((char *)LISTlength + sizeof(int));
@@ -1893,6 +1978,29 @@ if (Plugin_Active[9] == 1)
       DESC_LEN = (int *)(IP_nr_of_packets + 1);
       clear_shared_mem (0);
 
+      {
+        union semun arg;
+        unsigned short sem_init_vals[SEM_COUNT];
+
+        *semid = semget(IPC_PRIVATE, SEM_COUNT, IPC_CREAT | 0600);
+        if (*semid < 0) {
+          perror("semget failed");
+          exit(0);
+        }
+
+        sem_init_vals[SEM_STARTUP_BARRIER] = 0;
+        sem_init_vals[SEM_SCREEN_MUTEX]    = 1;
+        sem_init_vals[SEM_CONN_LIST]       = 1;
+        sem_init_vals[SEM_DATA_BUFFER]     = 1;
+
+        arg.array = sem_init_vals;
+        if (semctl(*semid, 0, SETALL, arg) < 0) {
+          perror("semctl SETALL failed");
+          semctl(*semid, 0, IPC_RMID);
+          exit(0);
+        }
+      }
+
       *DESC_LEN = 10;             /* not necessary, but for security (eliminate very unlikely races) */
 
       if ((Pid = fork ()) < 0)
@@ -1902,15 +2010,28 @@ if (Plugin_Active[9] == 1)
 	};
       if (Pid == 0)
 	{
-	  sleep (4);
+    usleep (100000);
+    sysv_sem_post(*semid, SEM_STARTUP_BARRIER);
 	  if (pcap_loop (dev_desc, CNT,
 			       interactive_packethandler, NULL) < 0)
 	      printf ("Capturing Packets Failed\n"), exit (0);
 	}
       else
 	{
+    int sem_result;
+
 	  exit_func (child_exit);
 	  signal (SIGCHLD, SIG_IGN);
+
+    sem_result = sysv_sem_timedwait(*semid, SEM_STARTUP_BARRIER, 10);
+    if (sem_result < 0) {
+      if (errno == ETIMEDOUT)
+        printf("Child process failed to initialize within 10 seconds\n");
+      else
+        perror("semaphore wait failed");
+      exit(0);
+    }
+
 	  if (logging_device != NULL)
 	    {
 	      if (stat (logging_device, &log_dev_stat) < 0)

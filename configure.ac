@@ -54,11 +54,25 @@ fi
 enable_interface=yes
 
 dnl Check Shared Memory support
-AC_CHECK_FUNCS(shmget)
-if test "$ac_cv_func_shmget" != yes; then
+AC_CHECK_FUNCS([shmget], [], [
+   enable_interface=no
+   AC_MSG_NOTICE([The interactive interface requires shared memory functionality])
+])
+
+dnl Check for System V semaphore support
+AC_CHECK_HEADERS([sys/sem.h], [], [
     enable_interface=no
-    AC_MSG_NOTICE([The interactive interface requires shared memory functionality])
-fi
+    AC_MSG_NOTICE([The interactive interface requires sys/sem.h])
+])
+AC_CHECK_FUNCS([semget semctl semop], [], [
+    enable_interface=no
+    AC_MSG_NOTICE([The interactive interface requires System V semaphore functions])
+])
+
+dnl Check for semtimedop - just a little optimization - not required
+AC_CHECK_FUNCS([semtimedop], [
+    AC_DEFINE(HAVE_SEMTIMEDOP, 1, [Define if semtimedop is available])
+])
 
 dnl Find ncurses.h and link ncurses only if all other checks pass
 if test "$enable_interface" = yes; then
