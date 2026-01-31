@@ -167,6 +167,7 @@ char Plugin_Active[10];
 /**** shared memory pointers ************************************************/
 char *SHARED, *connection_data, *logged_connections;
 struct shared_conn_data *running_connections;
+struct shared_sync_primitives *sync_prims;
 int *LISTlength, *DATAlength, memory_id;
 unsigned int  *TCP_nr_of_packets, *ICMP_nr_of_packets, *UDP_nr_of_packets;
 unsigned int  *IP_nr_of_packets;
@@ -179,7 +180,7 @@ struct shared_logged_conn *log_conn;
 FILE *log_dev_stream;
 struct stat log_dev_stat;
 
-volatile int LOGGING=0, screen_busy=0;
+volatile int LOGGING=0;
 char PACKET_INFO;
 int POINTpos=0, LISTpos=0;
 unsigned char COLOR_AVAIL=0;

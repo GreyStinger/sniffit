@@ -75,6 +75,22 @@ if test "$enable_interface" = yes; then
     ])
 fi
 
+dnl Check for System V semaphore support
+if test "$enable_interface" = yes; then
+    AC_CHECK_HEADERS([sys/sem.h], [], [
+        enable_interface=no
+        AC_MSG_NOTICE([The interactive interface requires sys/sem.h])
+    ])
+    AC_CHECK_FUNCS([semget semctl semop], [], [
+        enable_interface=no
+        AC_MSG_NOTICE([The interactive interface requires System V semaphore functions])
+    ])
+    dnl Check for semtimedop (optional, fallback exists)
+    AC_CHECK_FUNCS([semtimedop], [
+        AC_DEFINE(HAVE_SEMTIMEDOP, 1, [Define if semtimedop is available])
+    ])
+fi
+
 dnl Define INCLUDE_INTERFACE or not
 if test "$enable_interface" = yes; then
     AC_DEFINE(INCLUDE_INTERFACE, 1, [Define to 1 to enable interactive interface])

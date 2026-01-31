@@ -17,7 +17,7 @@
 #include "sn_generation.h"
 #include "sn_interface.h"
 
-extern volatile int screen_busy;
+extern struct shared_sync_primitives *sync_prims;
 
 /*** forward declarations ***/
 static void transmit_UDP (int, char *,
@@ -65,7 +65,8 @@ while(count<count_ptr)
 		sprintf(msg,"Packet No: %d dispatched.",count+1);
 	     }
 	mvwaddstr(Msg_dsp,0,27,msg);
-	while(screen_busy!=0) {};
+	sysv_mutex_lock(sync_prims->semid, SEM_SCREEN_MUTEX);
+	sysv_mutex_unlock(sync_prims->semid, SEM_SCREEN_MUTEX);
 	wnoutrefresh(Msg_dsp);
 	doupdate();
 	count++;

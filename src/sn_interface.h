@@ -12,3 +12,10 @@ extern void forced_refresh (void);
 extern char *input_field(char *, char *, int);
 extern void mem_exit (void);
 extern void run_interface (void);
+
+/* semaphore helper functions */
+extern int sysv_sem_wait(int semid, int sem_num);
+extern int sysv_sem_post(int semid, int sem_num);
+extern int sysv_sem_timedwait(int semid, int sem_num, int timeout_sec);
+extern int sysv_mutex_lock(int semid, int sem_num);
+extern int sysv_mutex_unlock(int semid, int sem_num);

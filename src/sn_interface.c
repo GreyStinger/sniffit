@@ -22,6 +22,7 @@
 /*** extern stuff ********/
 extern char *SHARED, *connection_data, *logged_connections;
 extern struct shared_conn_data *running_connections;
+extern struct shared_sync_primitives *sync_prims;
 extern int *LISTlength, *DATAlength, memory_id;
 extern unsigned int  *TCP_nr_of_packets, *ICMP_nr_of_packets, *UDP_nr_of_packets;
 extern unsigned int  *IP_nr_of_packets;
@@ -35,7 +36,7 @@ extern struct shared_logged_conn *log_conn;
 extern FILE *log_dev_stream;
 extern struct stat log_dev_stat;
 
-extern volatile int LOGGING, screen_busy;
+extern volatile int LOGGING;
 extern char PACKET_INFO;
 extern int POINTpos, LISTpos;
 extern unsigned char COLOR_AVAIL;
@@ -450,7 +451,8 @@ if((POINTpos<0)&&(*LISTlength>=0)) POINTpos=0;
 if((POINTpos>*LISTlength)&&(*LISTlength>=0)) POINTpos=*LISTlength;
 if((POINTpos>*LISTlength)&&(*LISTlength<0)) POINTpos=-1;
 
-while(screen_busy!=0) {};    /* wait till screen operations stop */
+  sysv_mutex_lock(sync_prims->semid, SEM_SCREEN_MUTEX);
+  sysv_mutex_unlock(sync_prims->semid, SEM_SCREEN_MUTEX);
 #ifdef DEBUG
 sprintf(debug_line,"FIX: POINTpos: %d  LISTlength: %d  LISTpos: %d\n",POINTpos,*LISTlength,LISTpos);
 debug_msg(debug_line);
@@ -510,7 +512,8 @@ char *input_field(char *string, char *input, int flag)
 	whline(Work_txt,' ',COLS);
 	whline(Work_inp,' ',50);
 	mvwaddstr(Work_txt,0,0,string);
-	while(screen_busy!=0) {};
+  sysv_mutex_lock(sync_prims->semid, SEM_SCREEN_MUTEX);
+  sysv_mutex_unlock(sync_prims->semid, SEM_SCREEN_MUTEX);
 	wnoutrefresh(Work_txt);wnoutrefresh(Work_inp);
 	doupdate();
 	echo();mvwgetstr(Work_inp,0,0,dummy);noecho();
@@ -566,6 +569,7 @@ static void interaction (int sig)              /* invoked when data arrives */
 int i;
 struct shared_conn_data *conn = running_connections;
 
+set_signal(SIGUSR1,interaction);
 
 /* timeout increase */
 for(i=0;i<CONNECTION_CAPACITY;i++)
@@ -573,7 +577,8 @@ for(i=0;i<CONNECTION_CAPACITY;i++)
 		conn[i].timeout+=1;
 
 if((LOGGING==1)&&(log_conn->log_enter[0]==0)) stop_logging();
-screen_busy=1;
+sysv_mutex_lock(sync_prims->semid, SEM_SCREEN_MUTEX);
+sysv_sem_wait(sync_prims->semid, SEM_DATA_BUFFER);
 if((LOGGING==1)&&(*DATAlength!=0))
   	{
 	if(logging_device==NULL)
@@ -590,35 +595,35 @@ if((LOGGING==1)&&(*DATAlength!=0))
 		}
   	*DATAlength=0;
  	}
-screen_busy=0;
+sysv_sem_post(sync_prims->semid, SEM_DATA_BUFFER);
+sysv_mutex_unlock(sync_prims->semid, SEM_SCREEN_MUTEX);
 forced_refresh();
-set_signal(SIGUSR1,interaction);
 }
 
 static void packet_info_handler (int signum)
 {
+set_signal(SIGALRM, packet_info_handler);
+
 #ifdef DEBUG
 		debug_msg("ALARM RANG");
 #endif
-screen_busy=1;
+sysv_mutex_lock(sync_prims->semid, SEM_SCREEN_MUTEX);
 mvwprintw(packets_box.work_window,0,1,"IP packets/sec.  : %12u",(*IP_nr_of_packets)/INFO_TIMER);
 mvwprintw(packets_box.work_window,1,1,"TCP packets/sec. : %12u",(*TCP_nr_of_packets)/INFO_TIMER);
 mvwprintw(packets_box.work_window,2,1,"ICMP packets/sec.: %12u",(*ICMP_nr_of_packets)/INFO_TIMER);
 mvwprintw(packets_box.work_window,3,1,"UDP packets/sec. : %12u",(*UDP_nr_of_packets)/INFO_TIMER);
 mvwprintw(packets_box.work_window,4,1,"bytes/sec. (TCP) : % 12ld",(*TCP_bytes_in_packets)/INFO_TIMER);
 mvwprintw(packets_box.work_window,5,1,"bytes/sec. (UDP) : % 12ld",(*UDP_bytes_in_packets)/INFO_TIMER);
-screen_busy=0;
+sysv_mutex_unlock(sync_prims->semid, SEM_SCREEN_MUTEX);
 
 forced_refresh();
-/* reinstall handler, reset alarm */
+/* reset alarm and counters */
 *IP_nr_of_packets=0;
 *TCP_nr_of_packets=*TCP_bytes_in_packets=0;
 *ICMP_nr_of_packets=0;
 *UDP_nr_of_packets=*UDP_bytes_in_packets=0;
-set_signal(SIGALRM, packet_info_handler);
 alarm(INFO_TIMER);
 }
-
 
 /* at/on_exit's  */
 
@@ -638,6 +643,10 @@ reset_shell_mode();
 
 void mem_exit (void)
 {
+if (sync_prims != NULL && sync_prims->initialized) {
+  semctl(sync_prims->semid, 0, IPC_RMID);
+}
+
 if(shmctl(memory_id,IPC_RMID,0)<0)
   	{perror("Sniffer Hartattack (you are fucked!) ");exit(0);};
 }
@@ -801,7 +810,6 @@ POINTpos=-1;
 LISTpos=0;
 LOGGING=0;
 PACKET_INFO=0;
-screen_busy=0;
 
 
 set_signal (SIGCHLD, SIG_IGN);
