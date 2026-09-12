@@ -54,11 +54,10 @@ fi
 enable_interface=yes
 
 dnl Check Shared Memory support
-AC_CHECK_FUNCS(shmget)
-if test "$ac_cv_func_shmget" != yes; then
+AC_CHECK_FUNCS([shmget], [], [
     enable_interface=no
     AC_MSG_NOTICE([The interactive interface requires shared memory functionality])
-fi
+])
 
 dnl Find ncurses.h and link ncurses only if all other checks pass
 if test "$enable_interface" = yes; then
